@@ -3,6 +3,7 @@ package selector
 import (
 	"fmt"
 	"regexp"
+	"strings"
 
 	"github.com/aws/amazon-ec2-instance-selector/v2/pkg/bytequantity"
 	"github.com/aws/aws-sdk-go/aws"
@@ -105,5 +106,27 @@ func (itf Selector) TransformFlexible(filters Filters) (Filters, error) {
 		filters.VCpusRange = &IntRangeFilter{LowerBound: defaultVcpus, UpperBound: defaultVcpus}
 	}
 
+	return filters, nil
+}
+
+// TransformEmr transforms lower level filters based on a regex for the supported EMR instance types
+func (itf Selector) TransformEmr(filters Filters) (Filters, error) {
+	if filters.Emr == nil {
+		return filters, nil
+	}
+	if filters.AllowList == nil {
+		mRegex := `m[1-2,4]|m3\.2?xlarge|m5[adgn]*\.([0-9]*xlarge|metal)|m6g\.[0-9]*xlarge`
+		cRegex := `c1\.|c3\.[0-9]*xlarge|c4\.|c5[adn]?\.[0-9]*xlarge|c6g\.[0-9]*xlarge|cg1\.|cc2\.|cr1\.`
+		rRegex := `r[3-4]\.[0-9]*xlarge|r5[adn]?\.([0-9]*xlarge|metal)|r6g\.[1-9]*xlarge`
+		iRegex := `i2\.|i3[en]*\.[0-9]*xlarge`
+		dgpxRegex := `d2\.|g2\.2xlarge|g[3-4][sdn]*\.[0-9]*xlarge|p2\.|p3\.|p3dn\.|hi1\.|hs1\.|h1\.`
+		xzRegex := `x1\.32xlarge|z1d\.[0-9]*xlarge`
+		itRegexList := []string{mRegex, cRegex, rRegex, iRegex, xzRegex, dgpxRegex}
+		emrAllowedInstanceTypes, err := regexp.Compile(strings.Join(itRegexList, "|"))
+		if err != nil {
+			return filters, err
+		}
+		filters.AllowList = emrAllowedInstanceTypes
+	}
 	return filters, nil
 }

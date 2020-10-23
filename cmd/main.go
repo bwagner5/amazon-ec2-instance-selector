@@ -73,6 +73,7 @@ const (
 const (
 	instanceTypeBase = "base-instance-type"
 	flexible         = "flexible"
+	emr              = "emr"
 )
 
 // Configuration Flag Constants
@@ -140,6 +141,7 @@ Full docs can be found at github.com/aws/amazon-` + binName
 
 	cli.SuiteStringFlag(instanceTypeBase, nil, nil, "Instance Type used to retrieve similarly spec'd instance types", nil)
 	cli.SuiteBoolFlag(flexible, nil, nil, "Retrieves a group of instance types spanning multiple generations based on opinionated defaults and user overridden resource filters")
+	cli.SuiteBoolFlag(emr, nil, nil, "Retrieves instance types supported by EMR")
 
 	// Configuration Flags - These will be grouped at the bottom of the help flags
 
@@ -202,6 +204,7 @@ Full docs can be found at github.com/aws/amazon-` + binName
 		DenyList:               cli.RegexMe(flags[denyList]),
 		InstanceTypeBase:       cli.StringMe(flags[instanceTypeBase]),
 		Flexible:               cli.BoolMe(flags[flexible]),
+		Emr:                    cli.BoolMe(flags[emr]),
 	}
 
 	if flags[verbose] != nil {

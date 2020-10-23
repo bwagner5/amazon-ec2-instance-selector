@@ -123,6 +123,7 @@ func (itf Selector) AggregateFilterTransform(filters Filters) (Filters, error) {
 	transforms := []FiltersTransform{
 		TransformFn(itf.TransformBaseInstanceType),
 		TransformFn(itf.TransformFlexible),
+		TransformFn(itf.TransformEmr),
 	}
 	var err error
 	for _, transform := range transforms {

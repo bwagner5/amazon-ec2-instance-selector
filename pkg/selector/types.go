@@ -179,4 +179,7 @@ type Filters struct {
 	// Flexible finds an opinionated set of general (c, m, r, t, a, etc.) instance types that match a criteria specified
 	// or defaults to 4 vcpus
 	Flexible *bool
+
+	// Emr finds instances that are supported by the Amazon Elastic Map Reduce service
+	Emr *bool
 }
