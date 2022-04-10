@@ -20,21 +20,22 @@ import (
 	"github.com/aws/amazon-ec2-instance-selector/v2/pkg/bytequantity"
 	"github.com/aws/amazon-ec2-instance-selector/v2/pkg/ec2pricing"
 	"github.com/aws/amazon-ec2-instance-selector/v2/pkg/instancetypes"
+	"github.com/aws/amazon-ec2-instance-selector/v2/pkg/selector/outputs"
 	"github.com/aws/aws-sdk-go/service/ec2/ec2iface"
 )
 
 // InstanceTypesOutput can be implemented to provide custom output to instance type results
 type InstanceTypesOutput interface {
-	Output([]*instancetypes.Details) []string
+	Output([]*instancetypes.Details, *outputs.SortOptions) []string
 }
 
 // InstanceTypesOutputFn is the func type definition for InstanceTypesOuput
-type InstanceTypesOutputFn func([]*instancetypes.Details) []string
+type InstanceTypesOutputFn func([]*instancetypes.Details, *outputs.SortOptions) []string
 
 // Output implements InstanceTypesOutput interface on InstanceTypesOutputFn
 // This allows any InstanceTypesOutputFn to be passed into funcs accepting InstanceTypesOutput interface
-func (fn InstanceTypesOutputFn) Output(instanceTypes []*instancetypes.Details) []string {
-	return fn(instanceTypes)
+func (fn InstanceTypesOutputFn) Output(instanceTypes []*instancetypes.Details, sortOptions *outputs.SortOptions) []string {
+	return fn(instanceTypes, sortOptions)
 }
 
 // Selector is used to filter instance type resource specs

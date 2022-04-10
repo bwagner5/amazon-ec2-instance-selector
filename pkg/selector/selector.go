@@ -124,7 +124,7 @@ func (itf Selector) Save() error {
 // matching the criteria within Filters and returns a simple list of instance type strings
 func (itf Selector) Filter(filters Filters) ([]string, error) {
 	outputFn := InstanceTypesOutputFn(outputs.SimpleInstanceTypeOutput)
-	output, _, err := itf.FilterWithOutput(filters, outputFn)
+	output, _, err := itf.FilterWithOutput(filters, outputFn, nil)
 	return output, err
 }
 
@@ -141,13 +141,13 @@ func (itf Selector) FilterVerbose(filters Filters) ([]*instancetypes.Details, er
 
 // FilterWithOutput accepts a Filters struct which is used to select the available instance types
 // matching the criteria within Filters and returns a list of strings based on the custom outputFn
-func (itf Selector) FilterWithOutput(filters Filters, outputFn InstanceTypesOutput) ([]string, int, error) {
+func (itf Selector) FilterWithOutput(filters Filters, outputFn InstanceTypesOutput, sortOptions *outputs.SortOptions) ([]string, int, error) {
 	instanceTypeInfoSlice, err := itf.rawFilter(filters)
 	if err != nil {
 		return nil, 0, err
 	}
 	instanceTypeInfoSlice, numOfItemsTruncated := itf.truncateResults(filters.MaxResults, instanceTypeInfoSlice)
-	output := outputFn.Output(instanceTypeInfoSlice)
+	output := outputFn.Output(instanceTypeInfoSlice, sortOptions)
 	return output, numOfItemsTruncated, nil
 }
 

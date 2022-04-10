@@ -23,11 +23,14 @@ import (
 	"strings"
 	"text/tabwriter"
 
+	"github.com/jedib0t/go-pretty/v6/table"
+
 	"github.com/aws/amazon-ec2-instance-selector/v2/pkg/instancetypes"
+	"github.com/aws/aws-sdk-go/aws"
 )
 
 // SimpleInstanceTypeOutput is an OutputFn which outputs a slice of instance type names
-func SimpleInstanceTypeOutput(instanceTypeInfoSlice []*instancetypes.Details) []string {
+func SimpleInstanceTypeOutput(instanceTypeInfoSlice []*instancetypes.Details, sortOpts *SortOptions) []string {
 	instanceTypeStrings := []string{}
 	for _, instanceTypeInfo := range instanceTypeInfoSlice {
 		instanceTypeStrings = append(instanceTypeStrings, *instanceTypeInfo.InstanceType)
@@ -36,7 +39,7 @@ func SimpleInstanceTypeOutput(instanceTypeInfoSlice []*instancetypes.Details) []
 }
 
 // VerboseInstanceTypeOutput is an OutputFn which outputs a slice of instance type names
-func VerboseInstanceTypeOutput(instanceTypeInfoSlice []*instancetypes.Details) []string {
+func VerboseInstanceTypeOutput(instanceTypeInfoSlice []*instancetypes.Details, sortOpts *SortOptions) []string {
 	output, err := json.MarshalIndent(instanceTypeInfoSlice, "", "    ")
 	if err != nil {
 		log.Println("Unable to convert instance type info to JSON")
@@ -49,7 +52,7 @@ func VerboseInstanceTypeOutput(instanceTypeInfoSlice []*instancetypes.Details) [
 }
 
 // TableOutputShort is an OutputFn which returns a CLI table for easy reading
-func TableOutputShort(instanceTypeInfoSlice []*instancetypes.Details) []string {
+func TableOutputShort(instanceTypeInfoSlice []*instancetypes.Details, sortOpts *SortOptions) []string {
 	if len(instanceTypeInfoSlice) == 0 {
 		return nil
 	}
@@ -85,7 +88,7 @@ func TableOutputShort(instanceTypeInfoSlice []*instancetypes.Details) []string {
 }
 
 // TableOutputWide is an OutputFn which returns a detailed CLI table for easy reading
-func TableOutputWide(instanceTypeInfoSlice []*instancetypes.Details) []string {
+func TableOutputWide(instanceTypeInfoSlice []*instancetypes.Details, sortOpts *SortOptions) []string {
 	if len(instanceTypeInfoSlice) == 0 {
 		return nil
 	}
@@ -175,7 +178,7 @@ func TableOutputWide(instanceTypeInfoSlice []*instancetypes.Details) []string {
 }
 
 // OneLineOutput is an output function which prints the instance type names on a single line separated by commas
-func OneLineOutput(instanceTypeInfoSlice []*instancetypes.Details) []string {
+func OneLineOutput(instanceTypeInfoSlice []*instancetypes.Details, sortOpts *SortOptions) []string {
 	instanceTypeNames := []string{}
 	for _, instanceType := range instanceTypeInfoSlice {
 		instanceTypeNames = append(instanceTypeNames, *instanceType.InstanceType)
@@ -184,6 +187,107 @@ func OneLineOutput(instanceTypeInfoSlice []*instancetypes.Details) []string {
 		return []string{}
 	}
 	return []string{strings.Join(instanceTypeNames, ",")}
+}
+
+func NewTable(instanceTypes []*instancetypes.Details, sortOpts *SortOptions) []string {
+	t := table.NewWriter()
+	t.SetStyle(table.Style{
+		Box:     table.StyleBoxDefault,
+		Options: table.OptionsNoBorders,
+		Format:  table.FormatOptionsDefault,
+	})
+	tbl := Table{
+		Headers: []interface{}{
+			"Instance Type",
+			"VCPUs",
+			"Mem (GiB)",
+			"Hypervisor",
+			"Current Gen",
+			"Hibernation Support",
+			"CPU Arch",
+			"Network Performance",
+			"ENIs",
+			"GPUs",
+			"GPU Mem (GiB)",
+			"GPU Info",
+			"On-Demand Price/Hr",
+			"Spot Price/Hr (30d avg)",
+		},
+		Rows: [][]interface{}{},
+	}
+	t.AppendHeader(tbl.Headers)
+
+	for _, instanceTypeInfo := range instanceTypes {
+		hypervisor := instanceTypeInfo.Hypervisor
+		if hypervisor == nil {
+			hypervisor = aws.String("none")
+		}
+		cpuArchitectures := []string{}
+		for _, cpuArch := range instanceTypeInfo.ProcessorInfo.SupportedArchitectures {
+			cpuArchitectures = append(cpuArchitectures, *cpuArch)
+		}
+		gpus := int64(0)
+		gpuMemory := int64(0)
+		gpuType := []string{}
+		if instanceTypeInfo.GpuInfo != nil {
+			gpuMemory = *instanceTypeInfo.GpuInfo.TotalGpuMemoryInMiB
+			for _, gpuInfo := range instanceTypeInfo.GpuInfo.Gpus {
+				gpus = gpus + *gpuInfo.Count
+				gpuType = append(gpuType, *gpuInfo.Manufacturer+" "+*gpuInfo.Name)
+			}
+		}
+
+		onDemandPricePerHourStr := "-Not Fetched-"
+		spotPricePerHourStr := "-Not Fetched-"
+		if instanceTypeInfo.OndemandPricePerHour != nil {
+			onDemandPricePerHourStr = fmt.Sprintf("$%s", formatFloat(*instanceTypeInfo.OndemandPricePerHour))
+		}
+		if instanceTypeInfo.SpotPrice != nil {
+			spotPricePerHourStr = fmt.Sprintf("$%s", formatFloat(*instanceTypeInfo.SpotPrice))
+		}
+		tbl.Rows = append(tbl.Rows, []interface{}{
+			{
+				*instanceTypeInfo.InstanceType,
+				*instanceTypeInfo.VCpuInfo.DefaultVCpus,
+				formatFloat(float64(*instanceTypeInfo.MemoryInfo.SizeInMiB) / 1024.0),
+				*hypervisor,
+				*instanceTypeInfo.CurrentGeneration,
+				*instanceTypeInfo.HibernationSupported,
+				strings.Join(cpuArchitectures, ", "),
+				*instanceTypeInfo.NetworkInfo.NetworkPerformance,
+				*instanceTypeInfo.NetworkInfo.MaximumNetworkInterfaces,
+				gpus,
+				formatFloat(float64(gpuMemory) / 1024.0),
+				strings.Join(gpuType, ", "),
+				onDemandPricePerHourStr,
+				spotPricePerHourStr,
+			},
+		})
+		t.AppendRow(table.Row{
+			*instanceTypeInfo.InstanceType,
+			*instanceTypeInfo.VCpuInfo.DefaultVCpus,
+			formatFloat(float64(*instanceTypeInfo.MemoryInfo.SizeInMiB) / 1024.0),
+			*hypervisor,
+			*instanceTypeInfo.CurrentGeneration,
+			*instanceTypeInfo.HibernationSupported,
+			strings.Join(cpuArchitectures, ", "),
+			*instanceTypeInfo.NetworkInfo.NetworkPerformance,
+			*instanceTypeInfo.NetworkInfo.MaximumNetworkInterfaces,
+			gpus,
+			formatFloat(float64(gpuMemory) / 1024.0),
+			strings.Join(gpuType, ", "),
+			onDemandPricePerHourStr,
+			spotPricePerHourStr,
+		})
+	}
+	return []string{t.Render()}
+}
+
+func sortModeToPrettySortMode(mode string) table.SortMode {
+	if strings.HasPrefix(strings.ToLower(mode), "asc") {
+		return table.Asc
+	}
+	return table.Dsc
 }
 
 func formatFloat(f float64) string {

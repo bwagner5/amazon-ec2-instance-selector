@@ -45,6 +45,7 @@ const (
 	tableOutput     = "table"
 	tableWideOutput = "table-wide"
 	oneLine         = "one-line"
+	newTable        = "table-new"
 )
 
 // Filter Flag Constants
@@ -104,6 +105,7 @@ const (
 	output     = "output"
 	cacheTTL   = "cache-ttl"
 	cacheDir   = "cache-dir"
+	sortBy     = "sort-by"
 )
 
 var (
@@ -131,6 +133,7 @@ Full docs can be found at github.com/aws/amazon-` + binName
 		tableOutput,
 		tableWideOutput,
 		oneLine,
+		newTable,
 	}
 	resultsOutputFn := outputs.SimpleInstanceTypeOutput
 
@@ -187,6 +190,7 @@ Full docs can be found at github.com/aws/amazon-` + binName
 	cli.ConfigStringFlag(output, cli.StringMe("o"), nil, fmt.Sprintf("Specify the output format (%s)", strings.Join(cliOutputTypes, ", ")), nil)
 	cli.ConfigIntFlag(cacheTTL, nil, env.WithDefaultInt("EC2_INSTANCE_SELECTOR_CACHE_TTL", 168), "Cache TTLs in hours for pricing and instance type caches. Setting the cache to 0 will turn off caching and cleanup any on-disk caches.")
 	cli.ConfigPathFlag(cacheDir, nil, env.WithDefaultString("EC2_INSTANCE_SELECTOR_CACHE_DIR", "~/.ec2-instance-selector/"), "Directory to save the pricing and instance type caches")
+	cli.ConfigStringFlag(sortBy, cli.StringMe("s"), cli.StringMe("vcpus:asc"), "Columns to sort by", nil)
 	cli.ConfigBoolFlag(verbose, cli.StringMe("v"), nil, "Verbose - will print out full instance specs")
 	cli.ConfigBoolFlag(help, cli.StringMe("h"), nil, "Help")
 	cli.ConfigBoolFlag(version, nil, nil, "Prints CLI version")
@@ -221,6 +225,7 @@ Full docs can be found at github.com/aws/amazon-` + binName
 		}
 	}
 	registerShutdown(shutdown)
+	sortOptions := outputs.SortOptionsFrom(cli.StringMe(flags[sortBy]))
 	outputFlag := cli.StringMe(flags[output])
 	if outputFlag != nil && *outputFlag == tableWideOutput {
 		// If output type is `table-wide`, simply print both prices for better comparison,
@@ -316,7 +321,7 @@ Full docs can be found at github.com/aws/amazon-` + binName
 
 	outputFn := getOutputFn(outputFlag, selector.InstanceTypesOutputFn(resultsOutputFn))
 
-	instanceTypes, itemsTruncated, err := instanceSelector.FilterWithOutput(filters, outputFn)
+	instanceTypes, itemsTruncated, err := instanceSelector.FilterWithOutput(filters, outputFn, sortOptions)
 	if err != nil {
 		fmt.Printf("An error occurred when filtering instance types: %v", err)
 		os.Exit(1)
@@ -385,6 +390,8 @@ func getOutputFn(outputFlag *string, currentFn selector.InstanceTypesOutputFn) s
 			return selector.InstanceTypesOutputFn(outputs.TableOutputShort)
 		case oneLine:
 			return selector.InstanceTypesOutputFn(outputs.OneLineOutput)
+		case newTable:
+			return selector.InstanceTypesOutputFn(outputs.NewTable)
 		}
 	}
 	return outputFn
